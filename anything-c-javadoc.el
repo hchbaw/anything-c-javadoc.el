@@ -46,6 +46,8 @@
 ;;; Code:
 
 (require 'anything)
+(require 'simple)
+(require 'w3m)
 
 (defcustom anything-c-javadoc-dirs
   '("http://java.sun.com/javase/6/docs/api/"
@@ -54,52 +56,50 @@
   :type 'list
   :group 'anything-config)
 
-(defcustom anything-c-javadoc-allclasses-cache-filename
-  (expand-file-name "~/.emacs.d/.anything-c-javadoc-allclasses-cache.el")
+(defcustom anything-c-javadoc-classes-cache-filename
+  (expand-file-name "~/.emacs.d/.anything-c-javadoc-classes-cache.el")
   "*Filename to be used as the cache of the javadocs' all-classes.html contents."
   :type 'file
   :group 'anything-config)
 
-(defvar anything-c-javadoc-candidate-buffer-name " *anything javadoc*")
+(defvar anything-c-javadoc-classes-candidate-buffer-name
+  " *anything javadoc classes*")
 
-(defvar anything-c-source-javadoc
-  '((name . "Java docs")
-    (init . acjd-initialize-candidate-buffer-maybe)
+(defvar anything-c-source-javadoc-classes
+  '((name . "Java docs (classes)")
+    (init
+     . (lambda ()
+         (acjd-initialize-candidate-buffer-maybe
+          anything-c-javadoc-classes-candidate-buffer-name
+          anything-c-javadoc-classes-cache-filename)))
     (candidates-in-buffer)
     (get-line . buffer-substring)
     (action
      . (("Browse"
          . (lambda (c)
-             (browse-url (format "%s%s.html#skip-navbar_top"
-                                 (get-text-property 0 'dirname c)
-                                 (replace-regexp-in-string "\\." "/" c)))))
+             (browse-url (anything-aif (get-text-property 0 'uri c)
+                             it
+                           (format "%s%s.html#skip-navbar_top"
+                                   (get-text-property 0 'dirname c)
+                                   (replace-regexp-in-string "\\." "/" c))))))
         ("Copy class name in kill-ring"
          . (lambda (c) (kill-new (substring-no-properties c))))
         ("Insert class name at point"
          . (lambda (c) (insert (substring-no-properties c))))))))
 
-;; (anything '(anything-c-source-javadoc))
+;; (anything '(anything-c-source-javadoc-classes))
 
-(defun acjd-initialize-candidate-buffer-maybe ()
-  (when (or current-prefix-arg
-            (not (get-buffer anything-c-javadoc-candidate-buffer-name)))
-    (acjd-initialize-candidate-buffer (acjd-regenerate-cache-p)))
-  (anything-candidate-buffer
-   (get-buffer anything-c-javadoc-candidate-buffer-name)))
+(defun acjd-initialize-candidate-buffer-maybe (buffer-name cache-filename)
+  (when (or current-prefix-arg (not (get-buffer buffer-name)))
+    (acjd-initialize-candidate-buffer
+     buffer-name cache-filename (acjd-regenerate-cache-p cache-filename)))
+  (anything-candidate-buffer (get-buffer buffer-name)))
 
-(defun acjd-regenerate-cache-p ()
-  (or (not (file-exists-p
-            (expand-file-name
-             anything-c-javadoc-allclasses-cache-filename)))
+(defun acjd-regenerate-cache-p (cache-filename)
+  (or (not (file-exists-p cache-filename))
       current-prefix-arg))
 
-(defun acjd-initialize-candidate-buffer (&optional regeneratep)
-  (acjd-initialize-candiate-buffer-0
-   anything-c-javadoc-candidate-buffer-name
-   anything-c-javadoc-allclasses-cache-filename 
-   regeneratep))
-
-(defun acjd-initialize-candiate-buffer-0
+(defun acjd-initialize-candidate-buffer
     (any-cand-buffer cache-file regeneratep)
   (flet ((cache (cache-file)
            (with-temp-buffer
@@ -129,38 +129,40 @@
           (kill-buffer b))))))
 
 (defun acjd-allclasses->any-cand-buffer (filename buf)
-  (flet ((insert-contents (filename)
-           (cond ((string-match "^http" filename)
-                  (let ((k (apply-partially (lambda (b s)
-                                              (with-current-buffer b
-                                                (insert s)))
-                                            (current-buffer))))
-                   (with-current-buffer (url-retrieve-synchronously filename)
-                     (goto-char (point-min))
-                     (re-search-forward "^$" nil 'move)
-                     (funcall k (buffer-substring-no-properties
-                                 (1+ (point)) (point-max)))
-                     (kill-buffer))))
-                 (t (insert-file-contents-literally filename)))
-           (delete-trailing-whitespace)
-           (goto-char (point-min))))
-    (with-temp-buffer
-      (loop initially (insert-contents filename)
-            until (or (eobp) (not (re-search-forward "^<A HREF=\"" nil t)))
-            when (looking-at (rx (group (+ nonl)) ".html"
-                                 (+ nonl) ">" (group (+ nonl)) "</A>" eol))
-            do ((lambda (fullname name javadoc-dirname)
-                  (with-current-buffer buf
-                    (insert fullname)
-                    (add-text-properties
-                     (line-beginning-position) (line-end-position)
-                     `(,@'()
-                          simple-name ,name
-                          dirname     ,javadoc-dirname))
-                    (insert "\n")))
-                (replace-regexp-in-string "/" "." (match-string 1))
-                (match-string 2)
-                (file-name-directory (acjd-fix-url-scheme filename)))))))
+  (with-temp-buffer
+    (loop initially (acjd-insert-contents filename (current-buffer))
+          until (or (eobp) (not (re-search-forward "^<A HREF=\"" nil t)))
+          when (looking-at (rx (group (+ nonl)) ".html"
+                               (+ nonl) ">" (group (+ nonl)) "</A>" eol))
+          do ((lambda (fullname name javadoc-dirname)
+                (with-current-buffer buf
+                  (insert fullname)
+                  (add-text-properties
+                   (line-beginning-position) (line-end-position)
+                   `(,@'()
+                        simple-name ,name
+                        dirname     ,javadoc-dirname))
+                  (insert "\n")))
+              (replace-regexp-in-string "/" "." (match-string 1))
+              (match-string 2)
+              (file-name-directory (acjd-fix-url-scheme filename))))))
+
+(defun acjd-insert-contents (filename buf)
+  (with-current-buffer buf
+   (cond ((string-match "^http" filename)
+          (let ((k (apply-partially (lambda (b s)
+                                      (with-current-buffer b
+                                        (insert s)))
+                                    (current-buffer))))
+            (with-current-buffer (url-retrieve-synchronously filename)
+              (goto-char (point-min))
+              (re-search-forward "^$" nil 'move)
+              (funcall k (buffer-substring-no-properties
+                          (1+ (point)) (point-max)))
+              (kill-buffer))))
+         (t (insert-file-contents-literally filename)))
+   (delete-trailing-whitespace)
+   (goto-char (point-min))))
 
 (defun acjd-fix-url-scheme (filename)
   (if (string-match "^http" filename) filename (concat "file://" filename)))
