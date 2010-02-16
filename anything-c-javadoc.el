@@ -171,18 +171,22 @@
           (kill-buffer b))))))
 
 (defun acjd-cand-buffer-cache (cache-file make-cand-buffer buffer write)
-  (with-current-buffer buffer
-    (loop for d in anything-c-javadoc-dirs
-          do (funcall make-cand-buffer d (current-buffer))
-          finally do
-          (sort-lines nil (point-min) (point-max))
-          (replace-string "&lt;" "<" nil (point-min) (point-max))
-          (replace-string "&gt;" ">" nil (point-min) (point-max))
-          (when anything-c-javadoc-paren-face
-            (ajcd-anything-mp-highlight-region (point-min) (point-max)
-                                               (rx (or ?( ?) ?[ ?]))
-                                               anything-c-javadoc-paren-face))
-          (funcall write (current-buffer)))))
+  (flet ((replace-text (from to)
+           (goto-char (point-min))
+           (while (re-search-forward (regexp-quote from) nil t)
+             (replace-match to))))
+    (with-current-buffer buffer
+      (loop for d in anything-c-javadoc-dirs
+            do (funcall make-cand-buffer d (current-buffer))
+            finally do
+            (sort-lines nil (point-min) (point-max))
+            (replace-text "&lt;" "<")
+            (replace-text "&gt;" ">")
+            (anything-aif anything-c-javadoc-paren-face
+                (ajcd-anything-mp-highlight-region (point-min) (point-max)
+                                                   (rx (or ?( ?) ?[ ?]))
+                                                   it))
+            (funcall write (current-buffer))))))
 
 ;;; borrowed from anything-match-plugin.el
 (defun ajcd-anything-mp-highlight-region (start end regexp face)
