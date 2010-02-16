@@ -71,17 +71,18 @@
      . (lambda ()
          (acjd-initialize-candidate-buffer-maybe
           anything-c-javadoc-classes-candidate-buffer-name
-          anything-c-javadoc-classes-cache-filename)))
+          anything-c-javadoc-classes-cache-filename
+          (lambda (d b)
+            (acjd-allclasses->any-cand-buffer
+             (format "%sallclasses-frame.html" d) b)))))
     (candidates-in-buffer)
     (get-line . buffer-substring)
     (action
      . (("Browse"
          . (lambda (c)
-             (browse-url (anything-aif (get-text-property 0 'uri c)
-                             it
-                           (format "%s%s.html#skip-navbar_top"
-                                   (get-text-property 0 'dirname c)
-                                   (replace-regexp-in-string "\\." "/" c))))))
+             (browse-url (format "%s%s.html#skip-navbar_top"
+                                 (get-text-property 0 'dirname c)
+                                 (replace-regexp-in-string "\\." "/" c)))))
         ("Copy class name in kill-ring"
          . (lambda (c) (kill-new (substring-no-properties c))))
         ("Insert class name at point"
@@ -89,10 +90,12 @@
 
 ;; (anything '(anything-c-source-javadoc-classes))
 
-(defun acjd-initialize-candidate-buffer-maybe (buffer-name cache-filename)
+(defun acjd-initialize-candidate-buffer-maybe
+    (buffer-name cache-filename make-cand-buffer)
   (when (or current-prefix-arg (not (get-buffer buffer-name)))
     (acjd-initialize-candidate-buffer
-     buffer-name cache-filename (acjd-regenerate-cache-p cache-filename)))
+     buffer-name cache-filename (acjd-regenerate-cache-p cache-filename)
+     make-cand-buffer))
   (anything-candidate-buffer (get-buffer buffer-name)))
 
 (defun acjd-regenerate-cache-p (cache-filename)
@@ -100,12 +103,11 @@
       current-prefix-arg))
 
 (defun acjd-initialize-candidate-buffer
-    (any-cand-buffer cache-file regeneratep)
-  (flet ((cache (cache-file)
+    (any-cand-buffer cache-file regeneratep make-cand-buffer)
+  (flet ((cache (cache-file make-cand-buffer)
            (with-temp-buffer
              (loop for d in anything-c-javadoc-dirs
-                   do (acjd-allclasses->any-cand-buffer
-                       (format "%sallclasses-frame.html" d) (current-buffer))
+                   do (funcall make-cand-buffer d (current-buffer))
                    finally do
                    (sort-lines nil (point-min) (point-max))
                    ((lambda (buf)
@@ -117,7 +119,7 @@
                     (current-buffer))))))
     (when regeneratep
       (message "Generating javadoc cache...")
-      (cache cache-file)
+      (cache cache-file make-cand-buffer)
       (message "Generating javadoc cache...done."))
     (with-current-buffer (get-buffer-create any-cand-buffer)
       (erase-buffer)
