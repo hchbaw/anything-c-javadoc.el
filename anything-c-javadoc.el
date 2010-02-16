@@ -217,20 +217,20 @@
 
 (defun acjd-insert-contents (filename buf)
   (with-current-buffer buf
-   (cond ((string-match "^http" filename)
-          (let ((k (apply-partially (lambda (b s)
-                                      (with-current-buffer b
-                                        (insert s)))
-                                    (current-buffer))))
-            (with-current-buffer (url-retrieve-synchronously filename)
-              (goto-char (point-min))
-              (re-search-forward "^$" nil 'move)
-              (funcall k (buffer-substring-no-properties
-                          (1+ (point)) (point-max)))
-              (kill-buffer))))
-         (t (insert-file-contents-literally filename)))
-   (delete-trailing-whitespace)
-   (goto-char (point-min))))
+    (cond ((string-match "^http" filename)
+           (let ((k (apply-partially (lambda (b s)
+                                       (with-current-buffer b
+                                         (insert s)))
+                                     (current-buffer))))
+             (with-current-buffer (url-retrieve-synchronously filename)
+               (goto-char (point-min))
+               (re-search-forward "^$" nil 'move)
+               (funcall k (buffer-substring-no-properties
+                           (1+ (point)) (point-max)))
+               (kill-buffer))))
+          (t (insert-file-contents-literally filename)))
+    (delete-trailing-whitespace)
+    (goto-char (point-min))))
 
 (defun acjd-fix-url-scheme (filename)
   (if (string-match "^http" filename) filename (concat "file://" filename)))
@@ -280,8 +280,10 @@
                   (narrow-to-region (line-beginning-position)
                                     (line-end-position))
                   (if (looking-at
-                       (rx (group (1+ (not white))
-                           (>= 1 (1+ not-wordchar) (1+ word) (* not-wordchar)))
+                       (rx (group
+                            (1+ (not white))
+                            (>= 1
+                                (1+ not-wordchar) (1+ word) (* not-wordchar)))
                            (group (1+ nonl))
                            "<A HREF=\"" (1+ (not (any ?>))) "\">"
                            (* (or "<B>" "<CODE>")) (group (+? nonl))
