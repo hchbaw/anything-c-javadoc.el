@@ -39,9 +39,12 @@
 ;;  `anything-c-javadoc-dirs'
 ;;    *Urls of the javadoc to be used. A url will be treated as the absolute path on the local machine, unless starts with `http`.
 ;;    default = (quote ("http://java.sun.com/javase/6/docs/api/" "http://joda-time.sourceforge.net/api-release/"))
-;;  `anything-c-javadoc-allclasses-cache-filename'
+;;  `anything-c-javadoc-classes-cache-filename'
 ;;    *Filename to be used as the cache of the javadocs' all-classes.html contents.
-;;    default = (expand-file-name "~/.emacs.d/.anything-c-javadoc-allclasses-cache.el")
+;;    default = (expand-file-name "~/.emacs.d/.anything-c-javadoc-classes.cache")
+;;  `anything-c-javadoc-indexes-cache-filename'
+;;    *Filename to be used as the cache of the javadocs' indexed contents.
+;;    default = (expand-file-name "~/.emacs.d/.anything-c-javadoc-indexes.cache")
 
 ;;; Code:
 
@@ -57,13 +60,21 @@
   :group 'anything-config)
 
 (defcustom anything-c-javadoc-classes-cache-filename
-  (expand-file-name "~/.emacs.d/.anything-c-javadoc-classes-cache.el")
+  (expand-file-name "~/.emacs.d/.anything-c-javadoc-classes.cache")
   "*Filename to be used as the cache of the javadocs' all-classes.html contents."
+  :type 'file
+  :group 'anything-config)
+
+(defcustom anything-c-javadoc-indexes-cache-filename
+  (expand-file-name "~/.emacs.d/.anything-c-javadoc-indexes.cache")
+  "*Filename to be used as the cache of the javadocs' indexed contents."
   :type 'file
   :group 'anything-config)
 
 (defvar anything-c-javadoc-classes-candidate-buffer-name
   " *anything javadoc classes*")
+(defvar anything-c-javadoc-indexes-candidate-buffer-name
+  " *anything javadoc indexes*")
 
 (defvar anything-c-source-javadoc-classes
   '((name . "Java docs (classes)")
@@ -90,6 +101,23 @@
 
 ;; (anything '(anything-c-source-javadoc-classes))
 
+(defvar anything-c-source-javadoc-indexes
+  '((name . "Java docs (indexes)")
+    (init
+     . (lambda ()
+         (acjd-initialize-candidate-buffer-maybe
+          anything-c-javadoc-indexes-candidate-buffer-name
+          anything-c-javadoc-indexes-cache-filename
+          'acjd-index->any-cand-buffer)))
+    (candidates-in-buffer)
+    (get-line . buffer-substring)
+    (action
+     . (("Browse"
+         . (lambda (c)
+             (browse-url (get-text-property 0 'uri c))))))))
+
+;; (anything '(anything-c-source-javadoc-indexes))
+
 (defun acjd-initialize-candidate-buffer-maybe
     (buffer-name cache-filename make-cand-buffer)
   (when (or current-prefix-arg (not (get-buffer buffer-name)))
@@ -106,19 +134,16 @@
     (any-cand-buffer cache-file regeneratep make-cand-buffer)
   (flet ((cache (cache-file make-cand-buffer)
            (with-temp-buffer
-             (loop for d in anything-c-javadoc-dirs
-                   do (funcall make-cand-buffer d (current-buffer))
-                   finally do
-                   (sort-lines nil (point-min) (point-max))
-                   ((lambda (buf)
-                      (with-temp-buffer
-                        (prin1 (with-current-buffer buf
-                                 (buffer-substring (point-min) (point-max)))
-                               (current-buffer))
-                        (write-region (point-min) (point-max) cache-file)))
-                    (current-buffer))))))
+             (acjd-cand-buffer-cache
+              cache-file make-cand-buffer (current-buffer)
+              (lambda (buf)
+                (with-temp-buffer
+                  (prin1 (with-current-buffer buf
+                           (buffer-substring (point-min) (point-max)))
+                         (current-buffer))
+                  (write-region (point-min) (point-max) cache-file)))))))
     (when regeneratep
-      (message "Generating javadoc cache...")
+      (message "Generating javadoc cache...(this may take a while)")
       (cache cache-file make-cand-buffer)
       (message "Generating javadoc cache...done."))
     (with-current-buffer (get-buffer-create any-cand-buffer)
@@ -129,6 +154,16 @@
                        (goto-char (point-min))
                        (read (current-buffer))))
           (kill-buffer b))))))
+
+(defun acjd-cand-buffer-cache (cache-file make-cand-buffer buffer write)
+  (with-current-buffer buffer
+    (loop for d in anything-c-javadoc-dirs
+          do (funcall make-cand-buffer d (current-buffer))
+          finally do
+          (sort-lines nil (point-min) (point-max))
+          (replace-string "&lt;" "<" nil (point-min) (point-max))
+          (replace-string "&gt;" ">" nil (point-min) (point-max))
+          (funcall write (current-buffer)))))
 
 (defun acjd-allclasses->any-cand-buffer (filename buf)
   (with-temp-buffer
@@ -168,6 +203,61 @@
 
 (defun acjd-fix-url-scheme (filename)
   (if (string-match "^http" filename) filename (concat "file://" filename)))
+
+(defun acjd-contents-file-exists-p (filename)
+  (cond ((string-match "^https" filename)
+         (url-https-file-exists-p filename))
+        ((string-match "^http" filename)
+         (url-http-file-exists-p filename))
+        (t (file-exists-p filename))))
+
+(defun acjd-index->any-cand-buffer (dir buf)
+  (let ((indexall (format "%sindex-all.html" dir)))
+    (if (acjd-contents-file-exists-p indexall)
+        (acjd-index->any-cand-buffer-1 indexall buf)
+      (loop for i from 1 to 27
+            for file = (format "%sindex-files/index-%s.html" dir i)
+            when (acjd-contents-file-exists-p file)
+            do (acjd-index->any-cand-buffer-1 file buf)))))
+
+(defun acjd-index->any-cand-buffer-1 (filename buf)
+  (with-temp-buffer
+    (loop initially (acjd-insert-contents filename (current-buffer))
+          until (or (eobp) (not (re-search-forward "^<DT><A HREF=\"" nil t)))
+          when (looking-at (rx (+ nonl) "<DT><A HREF=\""))
+          do (goto-char (match-end 0))
+          when (looking-at
+                (rx (group (+ nonl)) "\"><B>" (group (+ nonl)) "</B>"
+                    "</A> -" eol))
+          do (apply
+              (lambda (canonical-filename
+                       relative name _classification _full-classname classname)
+                (with-current-buffer buf
+                  (insert classname "#" name)
+                  (add-text-properties
+                   (line-beginning-position) (line-end-position)
+                   `(,@'()
+                        uri ,(w3m-expand-url relative canonical-filename)))
+                  (insert "\n")))
+              (acjd-fix-url-scheme filename)
+              (match-string 1)
+              (match-string 2)
+              (progn
+                (forward-line 1)
+                (save-restriction
+                  (narrow-to-region (line-beginning-position)
+                                    (line-end-position))
+                  (if (looking-at
+                       (rx (group (1+ (not white)))
+                           (>= 1 (1+ not-wordchar) (1+ word) (* not-wordchar))
+                           (group (1+ nonl))
+                           "<A HREF=\"" (1+ (not (any ?>))) "\">"
+                           (* (or "<B>" "<CODE>")) (group (+? nonl))
+                           (* (or "</B>" "</CODE>")) "</A>"))
+                      (list (match-string 1)
+                            (concat (match-string 2) (match-string 3))
+                            (match-string 3))
+                    (error "cannot find index data"))))))))
 
 (provide 'anything-c-javadoc)
 ;;; anything-c-javadoc.el ends here
