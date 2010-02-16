@@ -148,7 +148,7 @@
       (message "Generating javadoc cache...done."))
     (with-current-buffer (get-buffer-create any-cand-buffer)
       (erase-buffer)
-      (let ((b (find-file-noselect cache-file)))
+      (let ((b (find-file-noselect cache-file t t)))
         (unwind-protect
              (insert (with-current-buffer b
                        (goto-char (point-min))
