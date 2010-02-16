@@ -45,6 +45,21 @@
 ;;  `anything-c-javadoc-indexes-cache-filename'
 ;;    *Filename to be used as the cache of the javadocs' indexed contents.
 ;;    default = (expand-file-name "~/.emacs.d/.anything-c-javadoc-indexes.cache")
+;;  `anything-c-javadoc-type-face'
+;;    *Face used to highlight type and classes.
+;;    default = (quote font-lock-type-face)
+;;  `anything-c-javadoc-parameter-type-face'
+;;    *Face used to highlight type and classes in the parameter list.
+;;    default = (quote font-lock-type-face)
+;;  `anything-c-javadoc-function-name-face'
+;;    *Face used to highlight function names.
+;;    default = (quote font-lock-function-name-face)
+;;  `anything-c-javadoc-variable-nmame-face'
+;;    *Face used to highlight variable names.
+;;    default = (quote font-lock-variable-name-face)
+;;  `anything-c-javadoc-paren-face'
+;;    *Face used to highlight parens.
+;;    default = nil
 
 ;;; Code:
 
@@ -163,7 +178,19 @@
           (sort-lines nil (point-min) (point-max))
           (replace-string "&lt;" "<" nil (point-min) (point-max))
           (replace-string "&gt;" ">" nil (point-min) (point-max))
+          (when anything-c-javadoc-paren-face
+            (ajcd-anything-mp-highlight-region (point-min) (point-max)
+                                               (rx (or ?( ?) ?[ ?]))
+                                               anything-c-javadoc-paren-face))
           (funcall write (current-buffer)))))
+
+;;; borrowed from anything-match-plugin.el
+(defun ajcd-anything-mp-highlight-region (start end regexp face)
+  (save-excursion
+    (goto-char start)
+    (let (me)
+      (while (and (setq me (re-search-forward regexp nil t)) (< (point) end))
+        (put-text-property (match-beginning 0) me 'face face)))))
 
 (defun acjd-allclasses->any-cand-buffer (filename buf)
   (with-temp-buffer
@@ -231,9 +258,10 @@
                     "</A> -" eol))
           do (apply
               (lambda (canonical-filename
-                       relative name _classification _full-classname classname)
+                       relative name classification _full-classname classname)
                 (with-current-buffer buf
-                  (insert classname "#" name)
+                  (apply 'insert
+                         (acjd-propertize classification classname name))
                   (add-text-properties
                    (line-beginning-position) (line-end-position)
                    `(,@'()
@@ -248,8 +276,8 @@
                   (narrow-to-region (line-beginning-position)
                                     (line-end-position))
                   (if (looking-at
-                       (rx (group (1+ (not white)))
-                           (>= 1 (1+ not-wordchar) (1+ word) (* not-wordchar))
+                       (rx (group (1+ (not white))
+                           (>= 1 (1+ not-wordchar) (1+ word) (* not-wordchar)))
                            (group (1+ nonl))
                            "<A HREF=\"" (1+ (not (any ?>))) "\">"
                            (* (or "<B>" "<CODE>")) (group (+? nonl))
@@ -258,6 +286,56 @@
                             (concat (match-string 2) (match-string 3))
                             (match-string 3))
                     (error "cannot find index data"))))))))
+
+(defcustom anything-c-javadoc-type-face
+  'font-lock-type-face
+  "*Face used to highlight type and classes."
+  :type 'face
+  :group 'anything-config)
+(defcustom anything-c-javadoc-parameter-type-face
+  'font-lock-type-face
+  "*Face used to highlight type and classes in the parameter list."
+  :type 'face
+  :group 'anything-config)
+(defcustom anything-c-javadoc-function-name-face
+  'font-lock-function-name-face
+  "*Face used to highlight function names."
+  :type 'face
+  :group 'anything-config)
+(defcustom anything-c-javadoc-variable-nmame-face
+  'font-lock-variable-name-face
+  "*Face used to highlight variable names."
+  :type 'face
+  :group 'anything-config)
+(defcustom anything-c-javadoc-paren-face
+  nil
+  "*Face used to highlight parens."
+  :type 'face
+  :group 'anything-config)
+
+(defun acjd-propertize (classification classname x)
+  (let ((case-fold-search t))
+    (list
+     ;;(if (string-match "static" classification) "static " "")
+     (propertize classname 'face anything-c-javadoc-type-face) "#"
+     (cond ((string-match "method\\|constructor" classification)
+            (with-temp-buffer
+              (insert x)
+              (goto-char (point-min))
+              (looking-at (rx (group (+ print)) "("))
+              (put-text-property (match-beginning 1) (match-end 1)
+                                 'face anything-c-javadoc-function-name-face)
+              (goto-char (match-end 0))
+              (loop while (looking-at
+                           (rx (group (+? print)) (*? "[]") (or "," ")"))) do
+                    (put-text-property (point) (match-end 1)
+                                       'face
+                                       anything-c-javadoc-parameter-type-face)
+                    (goto-char (match-end 0)))
+              (buffer-substring (point-max) (point-min))))
+           ((string-match "variable" classification)
+            (propertize x 'face anything-c-javadoc-variable-nmame-face))
+           (t x)))))
 
 (provide 'anything-c-javadoc)
 ;;; anything-c-javadoc.el ends here
