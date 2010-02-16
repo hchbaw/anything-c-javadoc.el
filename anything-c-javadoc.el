@@ -137,11 +137,11 @@
              (acjd-cand-buffer-cache
               cache-file make-cand-buffer (current-buffer)
               (lambda (buf)
-                (with-temp-buffer
-                  (prin1 (with-current-buffer buf
-                           (buffer-substring (point-min) (point-max)))
-                         (current-buffer))
-                  (write-region (point-min) (point-max) cache-file)))))))
+                (with-temp-file cache-file
+                  (prog1 nil
+                    (prin1 (with-current-buffer buf
+                             (buffer-substring (point-min) (point-max)))
+                           (current-buffer)))))))))
     (when regeneratep
       (message "Generating javadoc cache...(this may take a while)")
       (cache cache-file make-cand-buffer)
