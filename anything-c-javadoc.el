@@ -99,6 +99,7 @@
     (init
      . (lambda ()
          (acjd-initialize-candidate-buffer-maybe
+          anything-c-javadoc-dirs
           anything-c-javadoc-classes-candidate-buffer-name
           anything-c-javadoc-classes-cache-filename
           (lambda (d b)
@@ -124,6 +125,7 @@
     (init
      . (lambda ()
          (acjd-initialize-candidate-buffer-maybe
+          anything-c-javadoc-dirs
           anything-c-javadoc-indexes-candidate-buffer-name
           anything-c-javadoc-indexes-cache-filename
           'acjd-index->any-cand-buffer)))
@@ -137,11 +139,11 @@
 ;; (anything '(anything-c-source-javadoc-indexes))
 
 (defun acjd-initialize-candidate-buffer-maybe
-    (buffer-name cache-filename create-cand-buffer)
+    (javadoc-dirs buffer-name cache-filename create-cand-buffer)
   (when (or current-prefix-arg (not (get-buffer buffer-name)))
     (acjd-initialize-candidate-buffer
-     buffer-name cache-filename (acjd-regenerate-cache-p cache-filename)
-     create-cand-buffer))
+     javadoc-dirs buffer-name cache-filename
+     (acjd-regenerate-cache-p cache-filename) create-cand-buffer))
   (anything-candidate-buffer (get-buffer buffer-name)))
 
 (defun acjd-regenerate-cache-p (cache-filename)
@@ -149,11 +151,11 @@
       current-prefix-arg))
 
 (defun acjd-initialize-candidate-buffer
-    (any-cand-buffer cache-file regeneratep create-cand-buffer)
+    (javadoc-dirs any-cand-buffer cache-file regeneratep create-cand-buffer)
   (flet ((cache (cache-file create-cand-buffer)
            (with-temp-buffer
              (acjd-cache-cand-buffer
-              cache-file create-cand-buffer (current-buffer)
+              javadoc-dirs cache-file create-cand-buffer (current-buffer)
               (lambda (buf)
                 (with-temp-file cache-file
                   (prog1 nil
@@ -173,13 +175,14 @@
                        (read (current-buffer))))
           (kill-buffer b))))))
 
-(defun acjd-cache-cand-buffer (cache-file create-cand-buffer buffer write)
+(defun acjd-cache-cand-buffer
+    (javadoc-dirs cache-file create-cand-buffer buffer write)
   (flet ((replace-text (from to)
            (goto-char (point-min))
            (while (re-search-forward (regexp-quote from) nil t)
              (replace-match to))))
     (with-current-buffer buffer
-      (loop for d in anything-c-javadoc-dirs
+      (loop for d in javadoc-dirs
             do (funcall create-cand-buffer d (current-buffer))
             finally do
             (sort-lines nil (point-min) (point-max))
