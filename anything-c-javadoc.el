@@ -111,12 +111,12 @@
      . (("Browse"
          . (lambda (c)
              (browse-url (format "%s%s.html#skip-navbar_top"
-                                 (get-text-property 0 'dirname c)
+                                 (get-text-property 0 'ajcd-dirname c)
                                  (replace-regexp-in-string "\\." "/" c)))))
-        ("Copy class name in kill-ring"
-         . (lambda (c) (kill-new (substring-no-properties c))))
         ("Insert class name at point"
-         . (lambda (c) (insert (substring-no-properties c))))))))
+         . (lambda (c) (insert (substring-no-properties c))))
+        ("Copy class name in kill-ring"
+         . (lambda (c) (kill-new (substring-no-properties c))))))))
 
 ;; (anything '(anything-c-source-javadoc-classes))
 
@@ -134,7 +134,11 @@
     (action
      . (("Browse"
          . (lambda (c)
-             (browse-url (get-text-property 0 'uri c))))))))
+             (browse-url (get-text-property 0 'acjd-uri c))))
+        ("Insert the name at point"
+         . (lambda (c) (insert (get-text-property 0 'acjd-name c))))
+        ("Copy the name in kill-ring"
+         . (lambda (c) (kill-new (get-text-property 0 'acjd-name c))))))))
 
 ;; (anything '(anything-c-source-javadoc-indexes))
 
@@ -189,9 +193,8 @@
             (replace-text "&lt;" "<")
             (replace-text "&gt;" ">")
             (anything-aif anything-c-javadoc-paren-face
-                (ajcd-anything-mp-highlight-region (point-min) (point-max)
-                                                   (rx (or ?( ?) ?[ ?]))
-                                                   it))
+                (ajcd-anything-mp-highlight-region
+                 (point-min) (point-max) (rx (or ?( ?) ?[ ?] ?< ?>)) it))
             (funcall write (current-buffer))))))
 
 ;;; borrowed from anything-match-plugin.el
@@ -210,12 +213,12 @@
                                (+ nonl) ">" (group (+ nonl)) "</A>" eol))
           do ((lambda (fullname name javadoc-dirname)
                 (with-current-buffer buf
-                  (insert (acjd-allclasses-propertize-face fullname))
+                  (insert (acjd-allclasses-propertize fullname))
                   (add-text-properties
-                   (line-beginning-position) (line-end-position)
+                   (line-beginning-position) (1+ (line-beginning-position))
                    `(,@'()
-                        simple-name ,name
-                        dirname     ,javadoc-dirname))
+                        ajcd-simple-name ,name
+                        ajcd-dirname     ,javadoc-dirname))
                   (insert "\n")))
               (replace-regexp-in-string "/" "." (match-string 1))
               (match-string 2)
@@ -270,12 +273,11 @@
               (lambda (canonical-filename
                        relative name classification _full-classname classname)
                 (with-current-buffer buf
-                  (apply 'insert (acjd-index-propertize-face
-                                  classification classname name))
-                  (add-text-properties
-                   (line-beginning-position) (line-end-position)
-                   `(,@'()
-                        uri ,(w3m-expand-url relative canonical-filename)))
+                  (insert (acjd-index-propertize classification classname
+                                                 name))
+                  (put-text-property
+                   (line-beginning-position) (1+ (line-beginning-position))
+                   'acjd-uri (w3m-expand-url relative canonical-filename))
                   (insert "\n")))
               (acjd-fix-url-scheme filename)
               (match-string 1)
@@ -331,7 +333,7 @@
   :type 'face
   :group 'anything-config)
 
-(defun acjd-allclasses-propertize-face (fullname)
+(defun acjd-allclasses-propertize (fullname)
   (with-temp-buffer
     (insert fullname)
     (goto-char (point-min))
@@ -344,48 +346,62 @@
                          anything-c-javadoc-type-face))
     (buffer-substring (point-max) (point-min))))
 
-(defun acjd-index-propertize-face (classification classname x)
-  (flet ((method-or-ctor-p (c)
-           (or (string-match "method\\|constructor" c)
-               (string-match "メソッド\\|コンストラクタ" c)))
-         (variablep (c)
-           (or (string-match "variable" c) (string-match "変数" c)))
-         (staticp (c)
-           (or (string-match "static" c) (string-match "静的" c))))
-    (let ((case-fold-search t)
-          (staticp (staticp classification))
-          (static-indicator "+"))
-      (list
-       (propertize classname 'face anything-c-javadoc-type-face)
-       "#"
-       (cond ((method-or-ctor-p classification)
-              (with-temp-buffer
-                (when staticp (insert static-indicator))
-                (insert x)
-                (goto-char (point-min))
-                (when staticp (goto-char (1+ (point))))
-                (looking-at (rx (group (+ print)) "("))
-                (put-text-property (match-beginning 1) (match-end 1)
-                                   'face anything-c-javadoc-function-name-face)
-                (when staticp
-                  (goto-char (match-end 1)) (insert static-indicator))
-                (goto-char (match-end 0))
-                (loop while (looking-at
-                             (rx (group (+? print)) (*? "[]") (or "," ")"))) do
-                      (put-text-property
-                       (point) (match-end 1) 'face
-                       anything-c-javadoc-parameter-type-face)
-                      (goto-char (match-end 0)))
-                (buffer-substring (point-max) (point-min))))
-             ((variablep classification)
-              (with-temp-buffer
-                (when staticp (insert static-indicator))
-                (insert x)
-                (put-text-property (- (point) (length x)) (point)
-                                   'face anything-c-javadoc-variable-name-face)
-                (when staticp (insert static-indicator))
-                (buffer-substring (point-max) (point-min))))
-             (t x))))))
+(defun acjd-index-propertize (classification classname x)
+  (macrolet ((with-propertize-temp-buffer (() &body body)
+               `(with-temp-buffer
+                  (insert (propertize
+                           classname 'face anything-c-javadoc-type-face)
+                          "#")
+                  ,@body
+                  (buffer-substring (point-min) (point-max)))))
+    (flet ((method-or-ctor-p (c)
+             (or (string-match "method\\|constructor" c)
+                 (string-match "メソッド\\|コンストラクタ" c)))
+           (variablep (c)
+             (or (string-match "variable" c) (string-match "変数" c)))
+           (staticp (c)
+             (or (string-match "static" c) (string-match "静的" c))))
+      (let ((case-fold-search t)
+            (staticp (staticp classification))
+            (static-indication "+"))
+        (cond ((method-or-ctor-p classification)
+               (with-propertize-temp-buffer ()
+                 (ajcd-index-propertize-method
+                  x staticp static-indication
+                  anything-c-javadoc-function-name-face
+                  anything-c-javadoc-parameter-type-face)))
+              ((variablep classification)
+               (with-propertize-temp-buffer ()
+                 (ajcd-index-propertize-variable
+                  x staticp static-indication
+                  anything-c-javadoc-variable-name-face)))
+              (t x))))))
+
+(defun ajcd-index-propertize-method
+    (x staticp static-indication funcname-face paramname-face)
+  (when staticp (insert static-indication))
+  (insert x)
+  (goto-char (- (point) (length x)))
+  (looking-at (rx (group (+ print)) "("))
+  (put-text-property (match-beginning 1) (match-end 1) 'face funcname-face)
+  (put-text-property (point-min) (1+ (point-min))
+                     'acjd-name (buffer-substring-no-properties
+                                 (match-beginning 1) (match-end 1)))
+  (when staticp (goto-char (match-end 1)) (insert static-indication))
+  (goto-char (match-end 0))
+  (loop while (looking-at (rx (group (+? print)) (*? "[]") (or "," ")"))) do
+        (put-text-property (point) (match-end 1) 'face paramname-face)
+        (goto-char (match-end 0))))
+
+(defun ajcd-index-propertize-variable
+    (x staticp static-indication varname-face)
+  (when staticp (insert static-indication))
+  (insert x)
+  (put-text-property (- (point) (length x)) (point) 'face varname-face)
+  (put-text-property (point-min) (1+ (point-min))
+                     'acjd-name (buffer-substring-no-properties
+                                 (- (point) (length x)) (point)))
+  (when staticp (insert static-indication)))
 
 (provide 'anything-c-javadoc)
 ;;; anything-c-javadoc.el ends here
