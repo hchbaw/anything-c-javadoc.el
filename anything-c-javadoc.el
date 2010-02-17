@@ -54,7 +54,7 @@
 ;;  `anything-c-javadoc-function-name-face'
 ;;    *Face used to highlight function names.
 ;;    default = (quote font-lock-function-name-face)
-;;  `anything-c-javadoc-variable-nmame-face'
+;;  `anything-c-javadoc-variable-name-face'
 ;;    *Face used to highlight variable names.
 ;;    default = (quote font-lock-variable-name-face)
 ;;  `anything-c-javadoc-paren-face'
@@ -308,7 +308,7 @@
   "*Face used to highlight function names."
   :type 'face
   :group 'anything-config)
-(defcustom anything-c-javadoc-variable-nmame-face
+(defcustom anything-c-javadoc-variable-name-face
   'font-lock-variable-name-face
   "*Face used to highlight variable names."
   :type 'face
