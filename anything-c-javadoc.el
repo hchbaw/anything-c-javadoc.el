@@ -94,51 +94,61 @@
 (defvar anything-c-javadoc-indexes-candidate-buffer-name
   " *anything javadoc indexes*")
 
+(defun acjd-source-base-classes (ass)
+  (append
+   ass
+   '((candidates-in-buffer)
+     (get-line . buffer-substring)
+     (action
+      . (("Browse"
+          . (lambda (c)
+              (browse-url (format "%s%s.html#skip-navbar_top"
+                                  (get-text-property 0 'ajcd-dirname c)
+                                  (replace-regexp-in-string "\\." "/" c)))))
+         ("Insert class name at point"
+          . (lambda (c) (insert (substring-no-properties c))))
+         ("Copy class name in kill-ring"
+          . (lambda (c) (kill-new (substring-no-properties c)))))))))
+
 (defvar anything-c-source-javadoc-classes
-  '((name . "Java docs (classes)")
-    (init
-     . (lambda ()
-         (acjd-initialize-candidate-buffer-maybe
-          anything-c-javadoc-dirs
-          anything-c-javadoc-classes-candidate-buffer-name
-          anything-c-javadoc-classes-cache-filename
-          (lambda (d b)
-            (acjd-allclasses->any-cand-buffer
-             (format "%sallclasses-frame.html" d) b)))))
-    (candidates-in-buffer)
-    (get-line . buffer-substring)
-    (action
-     . (("Browse"
-         . (lambda (c)
-             (browse-url (format "%s%s.html#skip-navbar_top"
-                                 (get-text-property 0 'ajcd-dirname c)
-                                 (replace-regexp-in-string "\\." "/" c)))))
-        ("Insert class name at point"
-         . (lambda (c) (insert (substring-no-properties c))))
-        ("Copy class name in kill-ring"
-         . (lambda (c) (kill-new (substring-no-properties c))))))))
+  (acjd-source-base-classes
+   '((name . "Java docs (classes)")
+     (init
+      . (lambda ()
+          (acjd-initialize-candidate-buffer-maybe
+           anything-c-javadoc-dirs
+           anything-c-javadoc-classes-candidate-buffer-name
+           anything-c-javadoc-classes-cache-filename
+           (lambda (d b)
+             (acjd-allclasses->any-cand-buffer
+              (format "%sallclasses-frame.html" d) b))))))))
 
 ;; (anything '(anything-c-source-javadoc-classes))
 
+(defun acjd-source-base-indexes (ass)
+  (append
+   ass
+   '((candidates-in-buffer)
+     (get-line . buffer-substring)
+     (action
+      . (("Browse"
+          . (lambda (c)
+              (browse-url (get-text-property 0 'acjd-uri c))))
+         ("Insert the name at point"
+          . (lambda (c) (insert (get-text-property 0 'acjd-name c))))
+         ("Copy the name in kill-ring"
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-name c)))))))))
+
 (defvar anything-c-source-javadoc-indexes
-  '((name . "Java docs (indexes)")
-    (init
-     . (lambda ()
-         (acjd-initialize-candidate-buffer-maybe
-          anything-c-javadoc-dirs
-          anything-c-javadoc-indexes-candidate-buffer-name
-          anything-c-javadoc-indexes-cache-filename
-          'acjd-index->any-cand-buffer)))
-    (candidates-in-buffer)
-    (get-line . buffer-substring)
-    (action
-     . (("Browse"
-         . (lambda (c)
-             (browse-url (get-text-property 0 'acjd-uri c))))
-        ("Insert the name at point"
-         . (lambda (c) (insert (get-text-property 0 'acjd-name c))))
-        ("Copy the name in kill-ring"
-         . (lambda (c) (kill-new (get-text-property 0 'acjd-name c))))))))
+  (acjd-source-base-indexes
+   '((name . "Java docs (indexes)")
+     (init
+      . (lambda ()
+          (acjd-initialize-candidate-buffer-maybe
+           anything-c-javadoc-dirs
+           anything-c-javadoc-indexes-candidate-buffer-name
+           anything-c-javadoc-indexes-cache-filename
+           'acjd-index->any-cand-buffer))))))
 
 ;; (anything '(anything-c-source-javadoc-indexes))
 
@@ -233,7 +243,7 @@
                                      (current-buffer))))
              (with-current-buffer (url-retrieve-synchronously filename)
                (goto-char (point-min))
-               (re-search-forward "^$" nil 'move)
+               (re-search-forward "^$" nil t)
                (funcall k (buffer-substring-no-properties
                            (1+ (point)) (point-max)))
                (kill-buffer))))
