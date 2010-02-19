@@ -179,7 +179,7 @@
     (when regeneratep
       (message "Generating javadoc cache...(this may take a while)")
       (cache cache-file create-cand-buffer)
-      (message "Generating javadoc cache...done."))
+      (message "Generating javadoc cache...Done."))
     (with-current-buffer (get-buffer-create any-cand-buffer)
       (erase-buffer)
       (let ((b (find-file-noselect cache-file t t)))
@@ -216,6 +216,11 @@
         (put-text-property (match-beginning 0) me 'face face)))))
 
 (defun acjd-allclasses->any-cand-buffer (filename buf)
+  (message "Creating classes buffer from %s..." filename)
+  (acjd-allclasses->any-cand-buffer-0 filename buf)
+  (message "Creating classes buffer from %s...Done." filename))
+
+(defun acjd-allclasses->any-cand-buffer-0 (filename buf)
   (with-temp-buffer
     (loop initially (acjd-insert-contents filename (current-buffer))
           until (or (eobp) (not (re-search-forward "^<A HREF=\"" nil t)))
@@ -262,13 +267,17 @@
         (t (file-exists-p filename))))
 
 (defun acjd-index->any-cand-buffer (dir buf)
-  (let ((indexall (format "%sindex-all.html" dir)))
-    (if (acjd-contents-file-exists-p indexall)
-        (acjd-index->any-cand-buffer-1 indexall buf)
-      (loop for i from 1 to 27
-            for file = (format "%sindex-files/index-%s.html" dir i)
-            when (acjd-contents-file-exists-p file)
-            do (acjd-index->any-cand-buffer-1 file buf)))))
+  (flet ((doit (file buf)
+           (message "Creating indexes buffer from %s..." file)
+           (acjd-index->any-cand-buffer-1 file buf)
+           (message "Creating indexes buffer from %s...Done." file)))
+   (let ((indexall (format "%sindex-all.html" dir)))
+     (if (acjd-contents-file-exists-p indexall)
+         (doit indexall buf)
+       (loop for i from 1 to 27
+             for file = (format "%sindex-files/index-%s.html" dir i)
+             when (acjd-contents-file-exists-p file)
+             do (doit file buf))))))
 
 (defun acjd-index->any-cand-buffer-1 (filename buf)
   (with-temp-buffer
