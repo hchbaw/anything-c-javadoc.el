@@ -103,7 +103,7 @@
       . (("Browse"
           . (lambda (c)
               (browse-url (format "%s%s.html#skip-navbar_top"
-                                  (get-text-property 0 'ajcd-dirname c)
+                                  (get-text-property 0 'acjd-dirname c)
                                   (replace-regexp-in-string "\\." "/" c)))))
          ("Insert class name at point"
           . (lambda (c) (insert (substring-no-properties c))))
@@ -203,12 +203,12 @@
             (replace-text "&lt;" "<")
             (replace-text "&gt;" ">")
             (anything-aif anything-c-javadoc-paren-face
-                (ajcd-anything-mp-highlight-region
+                (acjd-anything-mp-highlight-region
                  (point-min) (point-max) (rx (or ?( ?) ?[ ?] ?< ?>)) it))
             (funcall write (current-buffer))))))
 
 ;;; borrowed from anything-match-plugin.el
-(defun ajcd-anything-mp-highlight-region (start end regexp face)
+(defun acjd-anything-mp-highlight-region (start end regexp face)
   (save-excursion
     (goto-char start)
     (let (me)
@@ -227,8 +227,8 @@
                   (add-text-properties
                    (line-beginning-position) (1+ (line-beginning-position))
                    `(,@'()
-                        ajcd-simple-name ,name
-                        ajcd-dirname     ,javadoc-dirname))
+                        acjd-simple-name ,name
+                        acjd-dirname     ,javadoc-dirname))
                   (insert "\n")))
               (replace-regexp-in-string "/" "." (match-string 1))
               (match-string 2)
@@ -385,18 +385,18 @@
             (static-indication "+"))
         (cond ((method-or-ctor-p classification)
                (with-propertize-temp-buffer ()
-                 (ajcd-index-propertize-method
+                 (acjd-index-propertize-method
                   x staticp static-indication
                   anything-c-javadoc-function-name-face
                   anything-c-javadoc-parameter-type-face)))
               ((variablep classification)
                (with-propertize-temp-buffer ()
-                 (ajcd-index-propertize-variable
+                 (acjd-index-propertize-variable
                   x staticp static-indication
                   anything-c-javadoc-variable-name-face)))
               (t x))))))
 
-(defun ajcd-index-propertize-method
+(defun acjd-index-propertize-method
     (x staticp static-indication funcname-face paramname-face)
   (when staticp (insert static-indication))
   (insert x)
@@ -412,7 +412,7 @@
         (put-text-property (point) (match-end 1) 'face paramname-face)
         (goto-char (match-end 0))))
 
-(defun ajcd-index-propertize-variable
+(defun acjd-index-propertize-variable
     (x staticp static-indication varname-face)
   (when staticp (insert static-indication))
   (insert x)
