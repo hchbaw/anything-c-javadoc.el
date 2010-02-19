@@ -101,8 +101,8 @@
 (require 'url)
 
 (defcustom anything-c-javadoc-dirs
-  '("http://java.sun.com/javase/6/docs/api/"
-    "http://joda-time.sourceforge.net/api-release/")
+  '("http://joda-time.sourceforge.net/api-release/"
+    "http://java.sun.com/javase/6/docs/api/")
   "*Urls of the javadoc to be used. A url will be treated as the absolute path on the local machine, unless starts with `http`."
   :type 'list
   :group 'anything-config)
