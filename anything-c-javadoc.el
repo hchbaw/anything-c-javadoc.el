@@ -68,7 +68,7 @@
 
 (require 'anything)
 (require 'simple)
-(require 'w3m)
+(require 'url)
 
 (defcustom anything-c-javadoc-dirs
   '("http://java.sun.com/javase/6/docs/api/"
@@ -280,28 +280,37 @@
                 (rx (group (+ nonl)) "\"><B>" (group (+ nonl)) "</B>"
                     "</A> -" eol))
           do (apply
-              (lambda (canonical-filename
-                       relative name classification _full-classname classname)
+              (lambda (relative name base-filename
+                       classification +full-classname classname)
                 (with-current-buffer buf
                   (insert (acjd-index-propertize classification classname
                                                  name))
-                  (put-text-property
+                  (add-text-properties
                    (line-beginning-position) (1+ (line-beginning-position))
-                   'acjd-uri (w3m-expand-url relative canonical-filename))
+                   `(,@'()
+                        acjd-uri ,(url-expand-file-name relative base-filename)
+                        acjd-simple-name ,classname
+                        acjd-full-name ,(with-temp-buffer
+                                         (insert +full-classname)
+                                         (goto-char (point-min))
+                                         (when (looking-at (rx (1+ (not white))
+                                                               (1+ white)))
+                                           (goto-char (match-end 0)))
+                                         (buffer-substring
+                                          (point) (point-max)))))
                   (insert "\n")))
-              (acjd-fix-url-scheme filename)
               (match-string 1)
               (match-string 2)
+              (acjd-fix-url-scheme filename) ;; match-data safeness
               (progn
                 (forward-line 1)
                 (save-restriction
                   (narrow-to-region (line-beginning-position)
                                     (line-end-position))
                   (if (looking-at
-                       (rx (group
-                            (1+ (not white))
-                            (>= 1
-                                (1+ not-wordchar) (1+ word) (* not-wordchar)))
+                       (rx (group (1+ (not white))
+                                  (1+ white)
+                                  (* (1+ word) (1+ white)))
                            (group (1+ nonl))
                            "<A HREF=\"" (1+ (not (any ?>))) "\">"
                            (* (or "<B>" "<CODE>")) (group (+? nonl))
