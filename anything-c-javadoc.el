@@ -21,7 +21,30 @@
 
 ;;; Commentary:
 ;;
-;; Some anything onfigurations for quickly open javadocs.
+;; Some anything configurations for quickly open javadocs.
+;;
+;; This package works by scanning the allclasses-frame.html and the index
+;; file(s) (index-all.html or index-files/index-*.html) for the java class
+;; information such as the path to their documentation uri, making ordinary
+;; buffers suitable for anything's candidate-in-buffer capability. Then it
+;; dumps these buffers as a _big string_ into the cache files for the next
+;; Emacs session.
+;;
+;; This html-processing is so much iffy, fragile and maybe totally broken :)
+;;
+;; This package will generate cache files unless the cache files exist. The
+;; cache generation processes will take a _long_ while, please hold on for
+;; some time. The cache file generation will be take into account if the
+;; corresponding cache files do not exist or `anything' is being executed
+;; with any prefix-arguments. The location of the cache files are controlled
+;; with the customizable options:
+;; `anything-c-javadoc-classes-cache-filename' and
+;; `anything-c-javadoc-indexes-cache-filename'.
+;;
+;; If you want to add more javadocs, add the urls to `anything-c-javadoc-dirs'
+;; then regenerate the cache files with C-u M-x `anything-c-javadoc'. Or
+;; define more anything-sources with `install-anything-c-source-javadoc*'
+;; and (optionally) add newly created sources to `anything-c-javadoc-sources'.
 
 ;;; Installation:
 ;;
@@ -31,6 +54,10 @@
 ;;
 ;; Below are complete command list:
 ;;
+;;  `anything-c-javadoc'
+;;    Preconfigured `anything' for javadoc.
+;;  `anything-c-javadoc-at-point'
+;;    Preconfigured `anything' for javadoc at point.
 ;;
 ;;; Customizable Options:
 ;;
@@ -45,6 +72,9 @@
 ;;  `anything-c-javadoc-indexes-cache-filename'
 ;;    *Filename to be used as the cache of the javadocs' indexed contents.
 ;;    default = (expand-file-name "~/.emacs.d/.anything-c-javadoc-indexes.cache")
+;;  `anything-c-javadoc-sources'
+;;    *Anything sources used by `anything-c-javadoc'.
+;;    default = (quote (anything-c-source-javadoc-indexes anything-c-source-javadoc-classes))
 ;;  `anything-c-javadoc-type-face'
 ;;    *Face used to highlight type and classes.
 ;;    default = (quote font-lock-type-face)
@@ -106,8 +136,12 @@
                                   (get-text-property 0 'acjd-dirname c)
                                   (replace-regexp-in-string "\\." "/" c)))))
          ("Insert class name at point"
+          . (lambda (c) (insert (get-text-property 0 'acjd-simple-name c))))
+         ("Insert fully qualified class name at point"
           . (lambda (c) (insert (substring-no-properties c))))
          ("Copy class name in kill-ring"
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-simple-name c))))
+         ("Copy fully qualified class name in kill-ring"
           . (lambda (c) (kill-new (substring-no-properties c)))))))))
 
 (defvar anything-c-source-javadoc-classes
@@ -134,10 +168,19 @@
       . (("Browse"
           . (lambda (c)
               (browse-url (get-text-property 0 'acjd-uri c))))
-         ("Insert the name at point"
+         ("Insert name at point"
           . (lambda (c) (insert (get-text-property 0 'acjd-name c))))
-         ("Copy the name in kill-ring"
-          . (lambda (c) (kill-new (get-text-property 0 'acjd-name c)))))))))
+         ("Insert class name at point"
+          . (lambda (c) (insert (get-text-property 0 'acjd-simple-name c))))
+         ("Insert fully qualified class name at point"
+          . (lambda (c) (insert (get-text-property 0 'acjd-full-name c))))
+         ("Copy name in kill-ring"
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-name c))))
+         ("Copy class name in kill-ring"
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-simple-name c))))
+         ("Copy fully qualified class name in kill-ring"
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-full-name c))))))
+     )))
 
 (defvar anything-c-source-javadoc-indexes
   (acjd-source-base-indexes
@@ -151,6 +194,62 @@
            'acjd-index->any-cand-buffer))))))
 
 ;; (anything '(anything-c-source-javadoc-indexes))
+
+(defcustom anything-c-javadoc-sources
+  '(anything-c-source-javadoc-indexes anything-c-source-javadoc-classes)
+  "*Anything sources used by `anything-c-javadoc'."
+  :type 'list
+  :group 'anything-config)
+
+(defun anything-c-javadoc (&optional pattern)
+  "Preconfigured `anything' for javadoc."
+  (interactive)
+  (anything anything-c-javadoc-sources pattern nil nil nil
+            "*anything javadoc*"))
+
+(defun anything-c-javadoc-at-point ()
+  "Preconfigured `anything' for javadoc at point."
+  (interactive)
+  (anything-c-javadoc (thing-at-point 'symbol)))
+
+;; Piece of code which defines the above two anything-sources
+;; (anything-c-source-javadoc-{classes,indexes}) like vars.
+(defmacro install-anything-c-source-javadoc*
+    (javadoc-dirs
+     classes-name classes-cache-filename
+     indexes-name indexes-cache-filename)
+  "Expands into the code which (re-)defines CLASSES-NAME and INDEXES-NAME anything-sources.
+- JAVADOC-DIRS: same as `anything-c-javadoc-dirs'.
+- CLASSES-NAME: symbol name to be defined as the anything-source for `classes`.
+- CLASSES-CACHE-FILENAME: same as `anything-c-javadoc-classes-cache-filename'.
+- INDEXES-NAME: symbol name to be defined as the anything-source for `indexes`.
+- INDEXES-CACHE-FILENAME: same as `anything-c-javadoc-indexes-cache-filename'."
+  `(progn
+     (defvar ,classes-name)
+     (setq ,classes-name
+       (acjd-source-base-classes
+        '((name . ,(format "%s" classes-name))
+          (init
+           . (lambda ()
+               (acjd-initialize-candidate-buffer-maybe
+                ,javadoc-dirs
+                ,(format " *%s*" classes-name)
+                ,classes-cache-filename
+                (lambda (d b)
+                  (acjd-allclasses->any-cand-buffer
+                   (format "%sallclasses-frame.html" d) b))))))))
+     (defvar ,indexes-name)
+     (setq ,indexes-name
+       (acjd-source-base-indexes
+        '((name . ,(format "%s" indexes-name))
+          (init
+           . (lambda ()
+               (acjd-initialize-candidate-buffer-maybe
+                ,javadoc-dirs
+                ,(format " *%s*" indexes-name)
+                ,indexes-cache-filename
+                'acjd-index->any-cand-buffer))))))
+     (list ',indexes-name ',classes-name)))
 
 (defun acjd-initialize-candidate-buffer-maybe
     (javadoc-dirs buffer-name cache-filename create-cand-buffer)
