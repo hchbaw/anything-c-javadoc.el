@@ -345,12 +345,20 @@
                                        (with-current-buffer b
                                          (insert s)))
                                      (current-buffer))))
-             (with-current-buffer (url-retrieve-synchronously filename)
-               (goto-char (point-min))
-               (re-search-forward "^$" nil t)
-               (funcall k (buffer-substring-no-properties
-                           (1+ (point)) (point-max)))
-               (kill-buffer))))
+             (anything-aif (url-retrieve-synchronously filename)
+                 (with-current-buffer it
+                   (goto-char (point-min))
+                   (unwind-protect
+                        (if (or (not (re-search-forward "^$" nil t))
+                                (not (<= (1+ (point)) (point-max))))
+                            ;; url.el returns empty buffer for some reason.
+                            (error "url body retrieval failure: %s '%s'"
+                                 filename
+                                 (buffer-substring (point-min) (point-max)))
+                          (funcall k (buffer-substring-no-properties
+                                      (1+ (point)) (point-max))))
+                     (kill-buffer)))
+               (error "url retrieval failure: %s" filename))))
           (t (insert-file-contents filename)))
     (delete-trailing-whitespace)
     (goto-char (point-min))))
