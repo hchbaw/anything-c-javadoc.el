@@ -294,7 +294,7 @@
   (flet ((replace-text (from to)
            (goto-char (point-min))
            (while (re-search-forward (regexp-quote from) nil t)
-             (replace-match to))))
+             (replace-match to nil t))))
     (with-current-buffer buffer
       (loop for d in javadoc-dirs
             do (funcall create-cand-buffer d (current-buffer))
@@ -317,10 +317,10 @@
 
 (defun acjd-allclasses->any-cand-buffer (filename buf)
   (message "Creating classes buffer from %s..." filename)
-  (acjd-allclasses->any-cand-buffer-0 filename buf)
+  (acjd-allclasses->any-cand-buffer-1 filename buf)
   (message "Creating classes buffer from %s...Done." filename))
 
-(defun acjd-allclasses->any-cand-buffer-0 (filename buf)
+(defun acjd-allclasses->any-cand-buffer-1 (filename buf)
   (with-temp-buffer
     (loop initially (acjd-insert-contents filename (current-buffer))
           until (or (eobp) (not (re-search-forward "^<A HREF=\"" nil t)))
@@ -471,16 +471,21 @@
   :group 'anything-config)
 
 (defun acjd-allclasses-propertize (fullname)
+  (acjd-allclasses-propertize-1 fullname
+                                anything-c-javadoc-constant-face
+                                anything-c-javadoc-type-face))
+
+(defun acjd-allclasses-propertize-1 (fullname constant-face type-face)
   (with-temp-buffer
     (insert fullname)
     (goto-char (point-min))
     (let ((s (point)))
       (while (re-search-forward "\\." nil t)
-        (put-text-property s (match-beginning 0) 'face
-                           anything-c-javadoc-constant-face)
+        (when constant-face
+          (put-text-property s (match-beginning 0) 'face constant-face))
         (setq s (goto-char (point))))
-      (put-text-property s (line-end-position) 'face
-                         anything-c-javadoc-type-face))
+      (when type-face
+        (put-text-property s (line-end-position) 'face type-face)))
     (buffer-substring (point-max) (point-min))))
 
 (defun acjd-index-propertize (classification classname x)
@@ -520,21 +525,24 @@
   (insert x)
   (goto-char (- (point) (length x)))
   (looking-at (rx (group (+ print)) "("))
-  (put-text-property (match-beginning 1) (match-end 1) 'face funcname-face)
+  (when funcname-face
+    (put-text-property (match-beginning 1) (match-end 1) 'face funcname-face))
   (put-text-property (point-min) (1+ (point-min))
                      'acjd-name (buffer-substring-no-properties
                                  (match-beginning 1) (match-end 1)))
   (when staticp (goto-char (match-end 1)) (insert static-indication))
   (goto-char (match-end 0))
-  (loop while (looking-at (rx (group (+? print)) (*? "[]") (or "," ")"))) do
-        (put-text-property (point) (match-end 1) 'face paramname-face)
-        (goto-char (match-end 0))))
+  (when paramname-face
+    (while (looking-at (rx (group (+? print)) (*? "[]") (or "," ")")))
+      (put-text-property (point) (match-end 1) 'face paramname-face)
+      (goto-char (match-end 0)))))
 
 (defun acjd-index-propertize-variable
     (x staticp static-indication varname-face)
   (when staticp (insert static-indication))
   (insert x)
-  (put-text-property (- (point) (length x)) (point) 'face varname-face)
+  (when varname-face
+    (put-text-property (- (point) (length x)) (point) 'face varname-face))
   (put-text-property (point-min) (1+ (point-min))
                      'acjd-name (buffer-substring-no-properties
                                  (- (point) (length x)) (point)))
