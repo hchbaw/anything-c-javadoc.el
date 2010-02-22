@@ -130,12 +130,28 @@
    ass
    '((candidates-in-buffer)
      (get-line . buffer-substring)
+     (requires-pattern . 3)
      (action
       . (("Browse"
           . (lambda (c)
               (browse-url (format "%s%s.html#skip-navbar_top"
                                   (get-text-property 0 'acjd-dirname c)
                                   (replace-regexp-in-string "\\." "/" c)))))
+         ("Browse package"
+          . (lambda (c)
+              (browse-url
+               (format "%spackage-summary.html#skip-navbar_top"
+                       (url-file-directory
+                        (concat (get-text-property 0 'acjd-dirname c)
+                                (replace-regexp-in-string "\\." "/" c)))))))
+         ("Insert class name at point"
+          . (lambda (c) (insert (get-text-property 0 'acjd-simple-name c))))
+         ("Insert fully qualified class name at point"
+          . (lambda (c) (insert (substring-no-properties c))))
+         ("Copy class name in kill-ring"
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-simple-name c))))
+         ("Copy fully qualified class name in kill-ring"
+          . (lambda (c) (kill-new (substring-no-properties c))))
          ("Insert class name at point"
           . (lambda (c) (insert (get-text-property 0 'acjd-simple-name c))))
          ("Insert fully qualified class name at point"
@@ -165,10 +181,20 @@
    ass
    '((candidates-in-buffer)
      (get-line . buffer-substring)
+     (requires-pattern . 3)
      (action
       . (("Browse"
+          . (lambda (c) (browse-url (get-text-property 0 'acjd-uri c))))
+         ("Browse class"
           . (lambda (c)
-              (browse-url (get-text-property 0 'acjd-uri c))))
+              (browse-url (format "%s#skip-navbar_top"
+                                  (acjd-url-strip-trailing-anchor
+                                   (get-text-property 0 'acjd-uri c))))))
+         ("Browse package"
+          . (lambda (c)
+              (browse-url (format "%spackage-summary.html#skip-navbar_top"
+                                  (url-file-directory
+                                   (get-text-property 0 'acjd-uri c))))))
          ("Insert name at point"
           . (lambda (c) (insert (get-text-property 0 'acjd-name c))))
          ("Insert class name at point"
@@ -180,8 +206,24 @@
          ("Copy class name in kill-ring"
           . (lambda (c) (kill-new (get-text-property 0 'acjd-simple-name c))))
          ("Copy fully qualified class name in kill-ring"
-          . (lambda (c) (kill-new (get-text-property 0 'acjd-full-name c))))))
-     )))
+          . (lambda (c) (kill-new (get-text-property 0 'acjd-full-name c))))
+         )))))
+
+;;; borrowed from url.el (url-util.el)
+(defun acjd-url-normalize-url (url)
+  "Return a 'normalized' version of URL.
+Strips out default port numbers, etc."
+  (let (type data retval)
+    (setq data (url-generic-parse-url url)
+	  type (url-type data))
+    (if (member type '("www" "about" "mailto" "info"))
+	(setq retval url)
+      ;; FIXME all this does, and all this function seems to do in
+      ;; most cases, is remove any trailing "#anchor" part of a url.
+      (setf (url-target data) nil)
+      (setq retval (url-recreate-url data)))
+    retval))
+(defalias 'acjd-url-strip-trailing-anchor 'acjd-url-normalize-url)
 
 (defvar anything-c-source-javadoc-indexes
   (acjd-source-base-indexes
