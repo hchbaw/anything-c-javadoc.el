@@ -49,7 +49,8 @@
 
 ;;; Installation:
 ;;
-;; Put the anything-c-javadoc.el and anything.el to your load-path.
+;; Put the anything-c-javadoc.el and anything.el to your load-path and
+;; (optionally) install emacs-w3m package.
 
 ;;; Commands:
 ;;
@@ -100,6 +101,7 @@
 (require 'anything)
 (require 'simple)
 (require 'url)
+(eval-when-compile (require 'w3m))
 
 (defcustom anything-c-javadoc-dirs
   '("http://joda-time.sourceforge.net/api-release/"
@@ -429,6 +431,13 @@ Strips out default port numbers, etc."
              when (acjd-contents-file-exists-p file)
              do (doit file buf))))))
 
+(defsubst acjd-expand-url (relative base)
+  ;; I use emacs-w3m in case inside emacs. It seems that emacs-w3m doesn't
+  ;; like the "#anchor"ed url which `url-expand-file-name' returns.
+  (funcall (cond ((fboundp 'w3m-expand-url) 'w3m-expand-url)
+                 (t 'url-expand-file-name))
+           relative base))
+
 (defun acjd-index->any-cand-buffer-1 (filename buf)
   (with-temp-buffer
     (loop initially (acjd-insert-contents filename (current-buffer))
@@ -447,7 +456,7 @@ Strips out default port numbers, etc."
                   (add-text-properties
                    (line-beginning-position) (1+ (line-beginning-position))
                    `(,@'()
-                        acjd-uri ,(url-expand-file-name relative base-filename)
+                        acjd-uri ,(acjd-expand-url relative base-filename)
                         acjd-simple-name ,classname
                         acjd-full-name ,(with-temp-buffer
                                          ;; skip the first word if any.
