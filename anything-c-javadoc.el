@@ -539,4 +539,9 @@
   (when staticp (insert static-indication)))
 
 (provide 'anything-c-javadoc)
+
+;; Local Variables:
+;; coding: utf-8
+;; End:
+
 ;;; anything-c-javadoc.el ends here
