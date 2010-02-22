@@ -24,20 +24,21 @@
 ;; Some anything configurations for quickly open javadocs.
 ;;
 ;; This package works by scanning the allclasses-frame.html and the index
-;; file(s) (index-all.html or index-files/index-*.html) for the java class
-;; information such as the path to their documentation uri, making ordinary
-;; buffers suitable for anything's candidate-in-buffer capability. Then it
-;; dumps these buffers as a _big string_ into the cache files for the next
-;; Emacs session.
+;; file(s) (index-all.html or index-files/index-*.html), which are generated
+;; by the javadoc tool, for some information such as the path to their
+;; documentation uri and making ordinary buffers suitable for anything's
+;; candidate-in-buffer capability. Then it dumps each these buffers as a _big
+;; string_ into the cache file for the next Emacs session.
 ;;
-;; This html-processing is so much iffy, fragile and maybe totally broken :)
+;; This html-processing stuff is so much iffy, fragile and maybe totally
+;; broken :)
 ;;
-;; This package will generate cache files unless the cache files exist. The
-;; cache generation processes will take a _long_ while, please hold on for
-;; some time. The cache file generation will be take into account if the
-;; corresponding cache files do not exist or `anything' is being executed
-;; with any prefix-arguments. The location of the cache files are controlled
-;; with the customizable options:
+;; This package will generate cache files unless they exist. The cache
+;; generation processes will take a _long_ while, please hold on for some
+;; time. The cache file generation will be take into account if a). neither
+;; candidates-buffer nor corresponding cache file exit or b). `anything' is
+;; being executed with any prefix-arguments. The location of the cache files
+;; are controlled with the customizable options:
 ;; `anything-c-javadoc-classes-cache-filename' and
 ;; `anything-c-javadoc-indexes-cache-filename'.
 ;;
@@ -65,7 +66,7 @@
 ;;
 ;;  `anything-c-javadoc-dirs'
 ;;    *Urls of the javadoc to be used. A url will be treated as the absolute path on the local machine, unless starts with `http`.
-;;    default = (quote ("http://java.sun.com/javase/6/docs/api/" "http://joda-time.sourceforge.net/api-release/"))
+;;    default = (quote ("http://joda-time.sourceforge.net/api-release/" "http://java.sun.com/javase/6/docs/api/"))
 ;;  `anything-c-javadoc-classes-cache-filename'
 ;;    *Filename to be used as the cache of the javadocs' all-classes.html contents.
 ;;    default = (expand-file-name "~/.emacs.d/.anything-c-javadoc-classes.cache")
@@ -146,7 +147,7 @@
 
 (defvar anything-c-source-javadoc-classes
   (acjd-source-base-classes
-   '((name . "Java docs (classes)")
+   '((name . "Javadocs (classes)")
      (init
       . (lambda ()
           (acjd-initialize-candidate-buffer-maybe
@@ -184,7 +185,7 @@
 
 (defvar anything-c-source-javadoc-indexes
   (acjd-source-base-indexes
-   '((name . "Java docs (indexes)")
+   '((name . "Javadocs (indexes)")
      (init
       . (lambda ()
           (acjd-initialize-candidate-buffer-maybe
@@ -407,6 +408,7 @@
                         acjd-uri ,(url-expand-file-name relative base-filename)
                         acjd-simple-name ,classname
                         acjd-full-name ,(with-temp-buffer
+                                         ;; skip the first word if any.
                                          (insert +full-classname)
                                          (goto-char (point-min))
                                          (when (looking-at (rx (1+ (not white))
