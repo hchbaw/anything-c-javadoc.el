@@ -153,14 +153,6 @@
          ("Copy class name in kill-ring"
           . (lambda (c) (kill-new (get-text-property 0 'acjd-simple-name c))))
          ("Copy fully qualified class name in kill-ring"
-          . (lambda (c) (kill-new (substring-no-properties c))))
-         ("Insert class name at point"
-          . (lambda (c) (insert (get-text-property 0 'acjd-simple-name c))))
-         ("Insert fully qualified class name at point"
-          . (lambda (c) (insert (substring-no-properties c))))
-         ("Copy class name in kill-ring"
-          . (lambda (c) (kill-new (get-text-property 0 'acjd-simple-name c))))
-         ("Copy fully qualified class name in kill-ring"
           . (lambda (c) (kill-new (substring-no-properties c)))))))))
 
 (defvar anything-c-source-javadoc-classes
