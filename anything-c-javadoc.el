@@ -96,6 +96,11 @@
 ;;    *Face used to highlight parens.
 ;;    default = nil
 
+;;; History:
+
+;; v0.1.0
+;; Initial version.
+
 ;;; Code:
 
 (require 'anything)
