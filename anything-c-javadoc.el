@@ -106,7 +106,6 @@
 (require 'anything)
 (require 'simple)
 (require 'url)
-(eval-when-compile (require 'w3m))
 
 (defcustom anything-c-javadoc-dirs
   '("http://joda-time.sourceforge.net/api-release/"
