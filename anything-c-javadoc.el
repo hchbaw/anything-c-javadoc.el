@@ -77,6 +77,9 @@
 ;;  `anything-c-javadoc-sources'
 ;;    *Anything sources used by `anything-c-javadoc'.
 ;;    default = (quote (anything-c-source-javadoc-indexes anything-c-source-javadoc-classes))
+;;  `anything-c-javadoc-paren-face'
+;;    *Face used to highlight parens.
+;;    default = nil
 ;;  `anything-c-javadoc-type-face'
 ;;    *Face used to highlight type and classes.
 ;;    default = (quote font-lock-type-face)
@@ -92,9 +95,6 @@
 ;;  `anything-c-javadoc-constant-face'
 ;;    * Font Lock mode face used to highlight constants and labels.
 ;;    default = (quote font-lock-constant-face)
-;;  `anything-c-javadoc-paren-face'
-;;    *Face used to highlight parens.
-;;    default = nil
 
 ;;; History:
 
@@ -306,7 +306,7 @@ Strips out default port numbers, etc."
 
 (defun acjd-initialize-candidate-buffer
     (javadoc-dirs any-cand-buffer cache-file regeneratep create-cand-buffer)
-  (flet ((cache (cache-file create-cand-buffer)
+  (flet ((cache (cache-file javadoc-dirs create-cand-buffer)
            (with-temp-buffer
              (acjd-cache-cand-buffer
               javadoc-dirs cache-file create-cand-buffer (current-buffer)
@@ -318,7 +318,7 @@ Strips out default port numbers, etc."
                            (current-buffer)))))))))
     (when regeneratep
       (message "Generating javadoc cache...(this may take a while)")
-      (cache cache-file create-cand-buffer)
+      (cache cache-file javadoc-dirs create-cand-buffer)
       (message "Generating javadoc cache...Done."))
     (with-current-buffer (get-buffer-create any-cand-buffer)
       (erase-buffer)
@@ -328,6 +328,11 @@ Strips out default port numbers, etc."
                        (goto-char (point-min))
                        (read (current-buffer))))
           (kill-buffer b))))))
+
+(defcustom anything-c-javadoc-paren-face nil
+  "*Face used to highlight parens."
+  :type 'face
+  :group 'anything-config)
 
 (defun acjd-cache-cand-buffer
     (javadoc-dirs cache-file create-cand-buffer buffer write)
@@ -509,11 +514,6 @@ Strips out default port numbers, etc."
 (defcustom anything-c-javadoc-constant-face
   'font-lock-constant-face
   "* Font Lock mode face used to highlight constants and labels."
-  :type 'face
-  :group 'anything-config)
-(defcustom anything-c-javadoc-paren-face
-  nil
-  "*Face used to highlight parens."
   :type 'face
   :group 'anything-config)
 
