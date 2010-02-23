@@ -98,6 +98,9 @@
 
 ;;; History:
 
+;; v0.1.1
+;; Make w3m optional, and some cleanups.
+
 ;; v0.1.0
 ;; Initial version.
 
