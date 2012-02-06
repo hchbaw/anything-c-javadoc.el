@@ -134,11 +134,14 @@
 (defvar anything-c-javadoc-indexes-candidate-buffer-name
   " *anything javadoc indexes*")
 
+(defun acjd-get-line (s e)
+  (propertize #1=(buffer-substring s e) 'anything-realvalue #1#))
+
 (defun acjd-source-base-classes (ass)
   (append
    ass
    '((candidates-in-buffer)
-     (get-line . buffer-substring)
+     (get-line . acjd-get-line)
      (requires-pattern . 3)
      (action
       . (("Browse"
@@ -181,7 +184,7 @@
   (append
    ass
    '((candidates-in-buffer)
-     (get-line . buffer-substring)
+     (get-line . acjd-get-line)
      (requires-pattern . 3)
      (action
       . (("Browse"
